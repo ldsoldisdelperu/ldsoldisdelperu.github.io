@@ -569,7 +569,12 @@ function procesarDatosCotizaciones(data) {
 }
 
 function mostrarNotificacionExpress(cantidad) {
-    if (typeof Swal !== 'undefined') {
+    // Obtener el rol del usuario actual
+    const usuario = auth.obtenerSesion();
+    const rol = usuario.rol ? usuario.rol.toLowerCase() : '';
+    
+    // Solo mostrar la notificación si es administrador
+    if (rol === 'administrador' && typeof Swal !== 'undefined') {
         Swal.fire({
             title: '¡Atención!',
             html: `<div style="font-size: 1.2em">
@@ -584,8 +589,6 @@ function mostrarNotificacionExpress(cantidad) {
             confirmButtonColor: CONFIG.COLORS.primary,
             allowOutsideClick: false
         });
-    } else {
-        alert(`¡Atención! Hay ${cantidad} pedido(s) EXPRESS pendiente(s)`);
     }
 }
 
