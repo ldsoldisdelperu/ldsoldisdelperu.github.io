@@ -19,60 +19,83 @@ function cerrarSesion() {
     window.location.href = './index.html';
 }
 
-// Función para llamadas JSONP
-function llamarServidor(action, params = {}) {
+// Función para llamadas al servidor usando Fetch API con fallback a JSONP
+async function llamarServidor(action, params = {}) {
     console.log('Llamando al servidor:', action, 'con params:', params);
-    return new Promise((resolve, reject) => {
-        const nombreCallback = 'callback_' + Math.random().toString(36).substr(2, 9);
+    
+    try {
+        // URL del servidor de Google Apps Script
+        const baseUrl = 'https://script.google.com/macros/s/AKfycbyiHpw6uBp_WLV5i6wRQaCdyskKHSS2r7UuiS00Wis/dev';
         
-        window[nombreCallback] = function(response) {
-            console.log('Respuesta completa del servidor:', response);
-            if (response && response.success) {
-                if (response.data === undefined) {
-                    console.warn('La respuesta no contiene datos');
-                    resolve([]);
-                } else {
-                    console.log('Datos a devolver:', response.data);
-                    resolve(response.data);
-                }
-            } else {
-                console.error('Error en respuesta:', response);
-                reject(new Error(response?.message || 'Error en la operación'));
-            }
-            delete window[nombreCallback];
-            
-            // Limpiar el script después de la ejecución
-            const script = document.querySelector(`script[data-callback="${nombreCallback}"]`);
-            if (script && script.parentNode) {
-                script.parentNode.removeChild(script);
-            }
-        };
-
+        // Construir los parámetros de la URL
         const queryParams = new URLSearchParams({
             action: action,
-            callback: nombreCallback,
             ...params
-        }).toString();
+        });
 
-        const script = document.createElement('script');
-        script.setAttribute('data-callback', nombreCallback);
-        const url = 'https://script.google.com/macros/s/AKfycbyiHpw6uBp_WLV5i6wRQaCdyskKHSS2r7UuiS00Wis/dev?' + queryParams;
-        console.log('URL completa de la petición:', url);
-        script.src = url;
-        
-        script.onerror = (error) => {
-            console.error('Error al cargar el script:', error);
-            delete window[nombreCallback];
-            reject(new Error('Error de conexión con el servidor'));
-            
-            // Limpiar el script en caso de error
-            if (script.parentNode) {
-                script.parentNode.removeChild(script);
+        // Intentar primero con Fetch API
+        try {
+            const response = await fetch(`${baseUrl}?${queryParams}`, {
+                method: 'GET',
+                mode: 'cors',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Error en la respuesta del servidor');
             }
-        };
 
-        document.body.appendChild(script);
-    });
+            const data = await response.json();
+            console.log('Respuesta del servidor (Fetch):', data);
+
+            if (data && typeof data === 'object') {
+                return data;
+            }
+            throw new Error('Formato de respuesta inválido');
+        } catch (fetchError) {
+            console.log('Fetch falló, intentando con JSONP:', fetchError);
+            
+            // Si Fetch falla, usar JSONP como fallback
+            return new Promise((resolve, reject) => {
+                const callbackName = 'callback_' + Math.random().toString(36).substr(2, 9);
+                const script = document.createElement('script');
+                const timeoutId = setTimeout(() => {
+                    reject(new Error('Timeout en la llamada JSONP'));
+                    cleanup();
+                }, 10000);
+
+                // Función de limpieza
+                const cleanup = () => {
+                    delete window[callbackName];
+                    document.body.removeChild(script);
+                    clearTimeout(timeoutId);
+                };
+
+                // Configurar callback
+                window[callbackName] = (response) => {
+                    cleanup();
+                    console.log('Respuesta del servidor (JSONP):', response);
+                    if (response && response.success) {
+                        resolve(response.data);
+                    } else {
+                        reject(new Error(response?.message || 'Error en la operación'));
+                    }
+                };
+
+                // Agregar callback a los parámetros
+                queryParams.append('callback', callbackName);
+
+                // Configurar y agregar el script
+                script.src = `${baseUrl}?${queryParams}`;
+                document.body.appendChild(script);
+            });
+        }
+    } catch (error) {
+        console.error('Error en llamada al servidor:', error);
+        throw error;
+    }
 }
 
 // Exportar funciones
@@ -83,7 +106,8 @@ window.auth = {
     cerrarSesion,
     llamarServidor
 };
-console.log('Auth instance created successfully'); 
+
+console.log('Auth instance created successfully');
 
 function cargarDatosIniciales() {
     // Establecer fecha actual
