@@ -40,187 +40,98 @@ function initDataTable(data) {
         table.destroy();
     }
 
-    // Formatear fechas y asegurar que los datos sean un array
-    const cotizaciones = (Array.isArray(data) ? data : []).map(cotizacion => ({
-        ...cotizacion,
-        fecha: new Date(cotizacion.fecha).toLocaleDateString(),
-        id: cotizacion.id || '',  // Asegurar que siempre haya un ID
-        subtotal: parseFloat(cotizacion.subtotal || 0).toFixed(2),
-        igv: parseFloat(cotizacion.igv || 0).toFixed(2),
-        total: parseFloat(cotizacion.total || 0).toFixed(2)
-    }));
+    // Procesar los datos para el DataTable
+    const cotizaciones = data.map(cotizacion => {
+        console.log('Fecha original:', cotizacion.fecha);
+        // Extraer la fecha YYYY-MM-DD del string ISO
+        const fechaISO = cotizacion.fecha;
+        const fechaYMD = fechaISO.split('T')[0]; // Obtener solo la parte YYYY-MM-DD
+        const [year, month, day] = fechaYMD.split('-');
+        const fechaFormateada = `${day}/${month}/${year}`;
+        console.log('Fecha formateada:', fechaFormateada);
+        
+        return {
+            ...cotizacion,
+            fecha: fechaFormateada
+        };
+    });
 
-    table = $('#aprobadosTable').DataTable({
+    console.log('Datos procesados:', cotizaciones);
+
+    // Inicializar DataTable
+    table = $('#cotizacionesTable').DataTable({
         data: cotizaciones,
         language: spanishTranslation,
-        order: [[0, 'desc']], // Ordenar por fecha descendente
+        order: [[0, 'desc']],
         columns: [
             { data: 'fecha' },
-            { 
-                data: 'cliente',
-                defaultContent: 'N/A'
-            },
-            { 
-                data: 'unidad',
-                defaultContent: 'N/A'
-            },
-            { 
-                data: 'departamento',
-                defaultContent: 'N/A'
-            },
+            { data: 'usuario' },
+            { data: 'cliente' },
+            { data: 'unidad' },
+            { data: 'departamento' },
             { 
                 data: 'prioridad',
-                defaultContent: 'Normal',
                 render: function(data) {
-                    if (data && data.toLowerCase() === 'express') {
-                        return `<span class="priority-express">
-                                 <i class="fas fa-exclamation-triangle text-warning"></i> 
-                                 ${data}
-                               </span>`;
-                    }
-                    return data || 'Normal';
+                    return data === 'Express' ? 
+                        `<span class="priority-express">${data}</span>` : 
+                        data;
                 }
             },
             { 
                 data: 'subtotal',
-                defaultContent: '0.00',
                 render: function(data) {
-                    return 'S/. ' + (parseFloat(data) || 0).toFixed(2);
+                    return 'S/. ' + parseFloat(data).toFixed(2);
                 }
             },
             { 
                 data: 'igv',
-                defaultContent: '0.00',
                 render: function(data) {
-                    return 'S/. ' + (parseFloat(data) || 0).toFixed(2);
+                    return 'S/. ' + parseFloat(data).toFixed(2);
                 }
             },
             { 
                 data: 'total',
-                defaultContent: '0.00',
                 render: function(data) {
-                    return 'S/. ' + (parseFloat(data) || 0).toFixed(2);
+                    return 'S/. ' + parseFloat(data).toFixed(2);
                 }
             },
             {
                 data: 'estado',
-                defaultContent: 'pendiente',
                 render: function(data) {
-                    const colorMap = {
-                        'aprobada': '#28a745',
-                        'procesando': '#ffc107',
-                        'despachado': '#17a2b8',
-                        'en_destino': '#6f42c1',
-                        'entregado': '#20c997'
-                    };
-                    const estado = (data || 'pendiente').toLowerCase();
-                    const color = colorMap[estado] || '#6c757d';
-                    return `<span class="badge" style="background-color: ${color}">${estado.toUpperCase()}</span>`;
+                    return `<span class="status-badge status-${data}">${data.toUpperCase()}</span>`;
                 }
             },
             {
                 data: null,
                 render: function(data) {
-                    if (!data.id) return '';
-                    
-                    const buttons = [];
-                    
-                    // Botón de Ver Detalle - visible para todos
-                    buttons.push(`
-                        <button onclick="verDetalle('${data.id}')" class="btn btn-info btn-sm action-btn" title="Ver Detalle">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    `);
-
-                    // Botón de Ver PDF - visible para todos
-                    buttons.push(`
-                        <button onclick="verCotizacion('${data.id}')" class="btn btn-primary btn-sm action-btn" title="Ver PDF">
-                            <i class="fas fa-file-pdf"></i>
-                        </button>
-                    `);
-
-                    // Botones de estado - visibles para logístico y administrador
-                    const rolActual = rol ? rol.toString().toLowerCase() : '';
-                    console.log('Rol actual para botones:', rolActual);
-                    
-                    if (rolActual === 'logistico' || rolActual === 'administrador') {
-                        const estado = (data.estado || 'pendiente').toLowerCase();
-                        
-                        if (estado === 'aprobada') {
-                            buttons.push(`
-                                <button onclick="actualizarEstado('${data.id}', 'procesando')" 
-                                        class="btn btn-warning btn-sm action-btn" 
-                                        title="Marcar como Procesando">
-                                    <i class="fas fa-cog"></i>
-                                </button>`);
-                        }
-                        if (estado === 'procesando') {
-                            buttons.push(`
-                                <button onclick="actualizarEstado('${data.id}', 'despachado')" 
-                                        class="btn btn-info btn-sm action-btn" 
-                                        title="Marcar como Despachado">
-                                    <i class="fas fa-truck"></i>
-                                </button>`);
-                        }
-                        if (estado === 'despachado') {
-                            buttons.push(`
-                                <button onclick="actualizarEstado('${data.id}', 'en_destino')" 
-                                        class="btn btn-purple btn-sm action-btn" 
-                                        title="Marcar como En Destino">
-                                    <i class="fas fa-map-marker-alt"></i>
-                                </button>`);
-                        }
-                        if (estado === 'en_destino') {
-                            buttons.push(`
-                                <button onclick="actualizarEstado('${data.id}', 'entregado')" 
-                                        class="btn btn-success btn-sm action-btn" 
-                                        title="Marcar como Entregado">
-                                    <i class="fas fa-check-circle"></i>
-                                </button>`);
-                        }
-
-                        // Botón de subir evidencia - solo para logístico y administrador cuando está entregado
-                        if (estado === 'entregado' && !data.evidencia) {
-                            buttons.push(`
-                                <button onclick="subirEvidencia('${data.id}')" 
-                                        class="btn btn-warning btn-sm action-btn" 
-                                        title="Subir Evidencia">
-                                    <i class="fas fa-upload"></i>
-                                </button>`);
-                        }
-                    }
-
-                    // Botón de ver evidencia - visible para todos si existe evidencia
-                    if (data.evidencia) {
-                        buttons.push(`
-                            <button onclick="verEvidencia('${data.evidencia}')" 
-                                    class="btn btn-info btn-sm action-btn" 
-                                    title="Ver Evidencia">
-                                <i class="fas fa-image"></i>
-                            </button>`);
-                    }
-
-                    return `<div class="action-buttons">${buttons.join('')}</div>`;
+                    return `
+                        <div class="action-buttons">
+                            <button onclick="verDetalle('${data.id}')" class="btn-action" title="Ver Detalle">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button onclick="generarPDF('${data.id}')" class="btn-action" title="Generar PDF">
+                                <i class="fas fa-file-pdf"></i>
+                            </button>
+                            <button onclick="subirEvidencia('${data.id}')" class="btn-action" title="Subir Evidencia">
+                                <i class="fas fa-upload"></i>
+                            </button>
+                        </div>
+                    `;
                 }
             }
         ],
         responsive: true,
-        dom: 'Bfrtip',
+        dom: '<"top"Bf>rt<"bottom"lip><"clear">',
         buttons: [
             {
                 extend: 'excel',
-                text: '<i class="fas fa-file-excel"></i> Exportar a Excel',
+                text: '<i class="fas fa-file-excel"></i> Excel',
                 className: 'btn btn-success',
                 exportOptions: {
-                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+                    columns: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
                 }
             }
-        ],
-        createdRow: function(row, data) {
-            if (data.prioridad && data.prioridad.toLowerCase() === 'express') {
-                $(row).addClass('express-row');
-            }
-        }
+        ]
     });
 }
 
@@ -626,21 +537,15 @@ function procesarDetalle(response) {
         const cotizacion = response.data;
         
         // Formatear la fecha
-        let fechaFormateada = 'N/A';
-        try {
-            if (cotizacion.fecha) {
-                const fecha = new Date(cotizacion.fecha);
-                fechaFormateada = fecha.toLocaleDateString('es-ES', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                });
-            }
-        } catch (error) {
-            console.error('Error al formatear fecha:', error);
+        let fechaFormateada = cotizacion.fecha;
+        if (fechaFormateada && fechaFormateada.includes('-')) {
+            const [anio, mes, dia] = fechaFormateada.split('-');
+            fechaFormateada = `${dia}/${mes}/${anio}`;
         }
+        console.log('Fecha original:', cotizacion.fecha);
+        console.log('Fecha formateada:', fechaFormateada);
         
-        // Parsear los items que vienen como string JSON si es necesario
+        // Parsear los items
         let items = [];
         try {
             if (typeof cotizacion.items === 'string') {
@@ -653,16 +558,10 @@ function procesarDetalle(response) {
             items = [];
         }
 
-        // Formatear la cotización con los campos correctos
+        // Formatear la cotización
         const cotizacionFormateada = {
-            id: cotizacion.id,
+            ...cotizacion,
             fecha: fechaFormateada,
-            cliente: cotizacion.cliente || 'N/A',
-            unidad: cotizacion.unidad || 'N/A',
-            departamento: cotizacion.departamento || 'N/A',
-            subtotal: parseFloat(cotizacion.subtotal || 0).toFixed(2),
-            igv: parseFloat(cotizacion.igv || 0).toFixed(2),
-            total: parseFloat(cotizacion.total || 0).toFixed(2),
             items: items
         };
 
@@ -917,12 +816,9 @@ function generarPDFCotizacion(cotizacion) {
         }
     }
 
-    // Formatear la fecha
-    const fecha = new Date(cotizacion.fecha).toLocaleDateString('es-ES', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-    });
+    // Formatear la fecha directamente desde el formato YYYY-MM-DD
+    const [year, month, day] = (cotizacion.fecha || '').split('-');
+    const fecha = day && month && year ? `${day}/${month}/${year}` : 'N/A';
 
     // Generar el contenido del PDF
     const pdfContent = document.getElementById('pdfContent');
@@ -956,15 +852,20 @@ function generarPDFCotizacion(cotizacion) {
                 </tr>
             </thead>
             <tbody>
-                ${cotizacion.items.map(item => `
+                ${cotizacion.items.map(item => {
+                    const precioUnitario = parseFloat(item.precio) || 0;
+                    const cantidad = parseInt(item.cantidad) || 0;
+                    const total = precioUnitario * cantidad;
+                    return `
                     <tr style="border-bottom: 1px solid #ddd;">
                         <td style="padding: 10px;">${item.categoria}</td>
                         <td style="padding: 10px;">${item.item}</td>
-                        <td style="padding: 10px; text-align: center;">${item.cantidad}</td>
-                        <td style="padding: 10px; text-align: right;">S/. ${parseFloat(item.precio).toFixed(2)}</td>
-                        <td style="padding: 10px; text-align: right;">S/. ${(item.cantidad * item.precio).toFixed(2)}</td>
+                        <td style="padding: 10px; text-align: center;">${cantidad}</td>
+                        <td style="padding: 10px; text-align: right;">S/. ${precioUnitario.toFixed(2)}</td>
+                        <td style="padding: 10px; text-align: right;">S/. ${total.toFixed(2)}</td>
                     </tr>
-                `).join('')}
+                    `;
+                }).join('')}
             </tbody>
         </table>
 
