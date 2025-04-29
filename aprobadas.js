@@ -128,20 +128,12 @@ function initDataTable(data) {
                     // Botón de Ver Detalle - visible para todos
                     buttons.push(`
                         <button onclick="verDetalle('${data.id}')" class="btn btn-info btn-sm action-btn" title="Ver Detalle">
-                            <i class="fas fa-search"></i>
-                        </button>
-                    `);
-
-                    // Botón de Ver PDF - visible para todos
-                    buttons.push(`
-                        <button onclick="verCotizacion('${data.id}')" class="btn btn-primary btn-sm action-btn" title="Ver PDF">
-                            <i class="fas fa-file-pdf"></i>
+                            <i class="fas fa-search"></i> Ver Detalle
                         </button>
                     `);
 
                     // Botones de estado - visibles para logístico y administrador
                     const rolActual = rol ? rol.toString().toLowerCase() : '';
-                    console.log('Rol actual para botones:', rolActual);
                     
                     if (rolActual === 'logistico' || rolActual === 'administrador') {
                         const estado = (data.estado || 'pendiente').toLowerCase();
@@ -569,12 +561,7 @@ function procesarDatosCotizaciones(data) {
 }
 
 function mostrarNotificacionExpress(cantidad) {
-    // Obtener el rol del usuario actual
-    const usuario = auth.obtenerSesion();
-    const rol = usuario.rol ? usuario.rol.toLowerCase() : '';
-    
-    // Solo mostrar la notificación si es administrador
-    if (rol === 'administrador' && typeof Swal !== 'undefined') {
+    if (typeof Swal !== 'undefined') {
         Swal.fire({
             title: '¡Atención!',
             html: `<div style="font-size: 1.2em">
@@ -589,6 +576,8 @@ function mostrarNotificacionExpress(cantidad) {
             confirmButtonColor: CONFIG.COLORS.primary,
             allowOutsideClick: false
         });
+    } else {
+        alert(`¡Atención! Hay ${cantidad} pedido(s) EXPRESS pendiente(s)`);
     }
 }
 
@@ -678,105 +667,201 @@ function procesarDetalle(response) {
     }
 }
 
-function mostrarDetalleCotizacion(cotizacion) {
-    console.log('Mostrando detalles de cotización:', cotizacion);
-    
-    if (!cotizacion || typeof cotizacion !== 'object') {
-        console.error('Datos de cotización inválidos:', cotizacion);
-        return;
-    }
-
-    const content = document.getElementById('detalleContent');
-    if (!content) {
-        console.error('No se encontró el elemento detalleContent');
-        return;
-    }
-    
+async function mostrarDetalleCotizacion(cotizacion) {
     try {
-        let html = `
-            <div class="detail-grid">
-                <div class="detail-item">
-                    <div class="detail-label">Fecha:</div>
-                    <div>${cotizacion.fecha || 'N/A'}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Cliente:</div>
-                    <div>${cotizacion.cliente || 'N/A'}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Unidad:</div>
-                    <div>${cotizacion.unidad || 'N/A'}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Departamento:</div>
-                    <div>${cotizacion.departamento || 'N/A'}</div>
-                </div>
-            </div>
-
-            <h3 style="margin: 2rem 0 1rem 0; color: var(--primary-color);">Items de la Cotización</h3>
-            <div class="table-container" style="overflow-x: auto;">
-                <table class="items-table">
-                    <thead>
-                        <tr>
-                            <th>Categoría</th>
-                            <th>Item</th>
-                            <th>Cantidad</th>
-                            <th>Precio</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-
-        if (Array.isArray(cotizacion.items) && cotizacion.items.length > 0) {
-            cotizacion.items.forEach(item => {
-                html += `
-                    <tr>
-                        <td>${item.categoria || 'N/A'}</td>
-                        <td>${item.item || 'N/A'}</td>
-                        <td>${item.cantidad || '0'}</td>
-                        <td>S/. ${parseFloat(item.precio || 0).toFixed(2)}</td>
-                    </tr>
-                `;
-            });
-        } else {
-            html += `
-                <tr>
-                    <td colspan="4" class="text-center">No hay items disponibles</td>
-                </tr>
-            `;
+        let items = [];
+        if (typeof cotizacion.items === 'string') {
+            try {
+                items = JSON.parse(cotizacion.items);
+            } catch (e) {
+                console.error('Error al parsear items:', e);
+                items = [];
+            }
+        } else if (Array.isArray(cotizacion.items)) {
+            items = cotizacion.items;
         }
 
-        html += `
-                    </tbody>
-                </table>
-            </div>
+        // Formatear la fecha
+        const fecha = new Date(cotizacion.fecha).toLocaleDateString();
 
-            <div class="detail-grid" style="margin-top: 2rem;">
-                <div class="detail-item">
-                    <div class="detail-label">Subtotal:</div>
-                    <div>S/. ${cotizacion.subtotal}</div>
+        // Crear el modal si no existe
+        let modalElement = document.getElementById('detalleModal');
+        if (!modalElement) {
+            modalElement = document.createElement('div');
+            modalElement.id = 'detalleModal';
+            modalElement.className = 'modal';
+            document.body.appendChild(modalElement);
+        }
+
+        // Crear el contenido del modal
+        const modalContent = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Detalle de Cotización</h5>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-primary" onclick="imprimirCotizacion()">
+                            <i class="fas fa-print"></i> Imprimir
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="cerrarModal()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
-                <div class="detail-item">
-                    <div class="detail-label">IGV (18%):</div>
-                    <div>S/. ${cotizacion.igv}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Total:</div>
-                    <div>S/. ${cotizacion.total}</div>
+                <div class="modal-body" id="cotizacionDetalle">
+                    <div class="cotizacion-header">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p>RUC: 20609075954</p>
+                                <p>Dirección: Av. Separadora Industrial 751</p>
+                                <p>Teléfono: +51 932 777 509</p>
+                            </div>
+                            <div class="col-md-6 text-right">
+                                <h4>COTIZACIÓN</h4>
+                                <p>Fecha: ${fecha}</p>
+                                <p>N° Cotización: ${cotizacion.id || 'N/A'}</p>
+                            </div>
+                        </div>
+                        <div class="row mt-4">
+                            <div class="col-md-6">
+                                <h5>Cliente</h5>
+                                <p>Unidad: ${cotizacion.unidad || 'N/A'}</p>
+                                <p>Departamento: ${cotizacion.departamento || 'N/A'}</p>
+                                <p>Cliente: ${cotizacion.cliente || 'N/A'}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Detalles</h5>
+                                <p>Prioridad: ${cotizacion.prioridad || 'N/A'}</p>
+                                <p>Estado: ${cotizacion.estado ? cotizacion.estado.toUpperCase() : 'PENDIENTE'}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive mt-4">
+                        <table class="table table-bordered">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Categoría</th>
+                                    <th>Ítem</th>
+                                    <th>Cantidad</th>
+                                    <th>Precio Unitario</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${items.map(item => {
+                                    const cantidad = parseInt(item.cantidad) || 0;
+                                    const precioUnitario = parseFloat(item.precio) / cantidad;
+                                    const total = parseFloat(item.precio) || 0;
+                                    return `
+                                        <tr>
+                                            <td>${item.categoria || 'N/A'}</td>
+                                            <td>${item.item || 'N/A'}</td>
+                                            <td class="text-right">${cantidad}</td>
+                                            <td class="text-right">S/. ${precioUnitario.toFixed(2)}</td>
+                                            <td class="text-right">S/. ${total.toFixed(2)}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="4" class="text-right"><strong>Subtotal:</strong></td>
+                                    <td class="text-right">S/. ${parseFloat(cotizacion.subtotal || 0).toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4" class="text-right"><strong>IGV (18%):</strong></td>
+                                    <td class="text-right">S/. ${parseFloat(cotizacion.igv || 0).toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4" class="text-right"><strong>Total:</strong></td>
+                                    <td class="text-right">S/. ${parseFloat(cotizacion.total || 0).toFixed(2)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
                 </div>
             </div>
         `;
 
-        content.innerHTML = html;
-        document.getElementById('detalleModal').style.display = 'block';
+        modalElement.innerHTML = modalContent;
+        modalElement.style.display = 'block';
+
+        // Agregar event listener para cerrar el modal
+        modalElement.addEventListener('click', function(event) {
+            if (event.target === modalElement) {
+                modalElement.style.display = 'none';
+            }
+        });
+
     } catch (error) {
-        console.error('Error al generar HTML de detalles:', error);
+        console.error('Error al mostrar detalle:', error);
         Swal.fire({
             icon: 'error',
             title: 'Error',
             text: 'Error al mostrar los detalles de la cotización',
             confirmButtonColor: CONFIG.COLORS.primary
         });
+    }
+}
+
+function imprimirCotizacion() {
+    const contenido = document.getElementById('cotizacionDetalle').innerHTML;
+    const ventanaImpresion = window.open('', '_blank');
+    ventanaImpresion.document.write(`
+        <html>
+            <head>
+                <title>Imprimir Cotización</title>
+                <link href="https://fonts.googleapis.com/css2?family=Anaheim&display=swap" rel="stylesheet">
+                <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+                <style>
+                    body {
+                        font-family: 'Anaheim', sans-serif;
+                        padding: 20px;
+                    }
+                    .table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin-bottom: 1rem;
+                    }
+                    .table th, .table td {
+                        border: 1px solid #dee2e6;
+                        padding: 8px;
+                    }
+                    .text-right {
+                        text-align: right;
+                    }
+                    .thead-dark th {
+                        background-color: #19485F;
+                        color: white;
+                    }
+                    @media print {
+                        body { margin: 0; padding: 15px; }
+                        .btn-group { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                ${contenido}
+            </body>
+        </html>
+    `);
+    ventanaImpresion.document.close();
+    ventanaImpresion.print();
+}
+
+// Función para cerrar el modal
+function cerrarModal() {
+    const modal = document.getElementById('detalleModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+// Event listener para cerrar el modal al hacer clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('detalleModal');
+    if (event.target === modal) {
+        modal.style.display = 'none';
     }
 }
 
@@ -924,6 +1009,19 @@ function generarPDFCotizacion(cotizacion) {
         year: 'numeric'
     });
 
+    // Asegurarse de que los items sean un array
+    let items = [];
+    try {
+        if (typeof cotizacion.items === 'string') {
+            items = JSON.parse(cotizacion.items);
+        } else if (Array.isArray(cotizacion.items)) {
+            items = cotizacion.items;
+        }
+    } catch (error) {
+        console.error('Error al parsear items:', error);
+        items = [];
+    }
+
     // Generar el contenido del PDF
     const pdfContent = document.getElementById('pdfContent');
     pdfContent.innerHTML = `
@@ -956,15 +1054,21 @@ function generarPDFCotizacion(cotizacion) {
                 </tr>
             </thead>
             <tbody>
-                ${cotizacion.items.map(item => `
-                    <tr style="border-bottom: 1px solid #ddd;">
-                        <td style="padding: 10px;">${item.categoria}</td>
-                        <td style="padding: 10px;">${item.item}</td>
-                        <td style="padding: 10px; text-align: center;">${item.cantidad}</td>
-                        <td style="padding: 10px; text-align: right;">S/. ${parseFloat(item.precio).toFixed(2)}</td>
-                        <td style="padding: 10px; text-align: right;">S/. ${(item.cantidad * item.precio).toFixed(2)}</td>
-                    </tr>
-                `).join('')}
+                ${items.map(item => {
+                    const cantidad = parseInt(item.cantidad) || 0;
+                    const precioUnitario = parseFloat(item.precio) || 0;
+                    const total = cantidad * precioUnitario;
+                    
+                    return `
+                        <tr style="border-bottom: 1px solid #ddd;">
+                            <td style="padding: 10px;">${item.categoria || 'N/A'}</td>
+                            <td style="padding: 10px;">${item.item || 'N/A'}</td>
+                            <td style="padding: 10px; text-align: center;">${cantidad}</td>
+                            <td style="padding: 10px; text-align: right;">S/. ${precioUnitario.toFixed(2)}</td>
+                            <td style="padding: 10px; text-align: right;">S/. ${total.toFixed(2)}</td>
+                        </tr>
+                    `;
+                }).join('')}
             </tbody>
         </table>
 
@@ -972,15 +1076,15 @@ function generarPDFCotizacion(cotizacion) {
             <div style="width: 200px;">
                 <div style="display: flex; justify-content: space-between; padding: 5px 0;">
                     <strong>Subtotal:</strong>
-                    <span>S/. ${parseFloat(cotizacion.subtotal).toFixed(2)}</span>
+                    <span>S/. ${parseFloat(cotizacion.subtotal || 0).toFixed(2)}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 5px 0;">
                     <strong>IGV (18%):</strong>
-                    <span>S/. ${parseFloat(cotizacion.igv).toFixed(2)}</span>
+                    <span>S/. ${parseFloat(cotizacion.igv || 0).toFixed(2)}</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 10px 0; border-top: 2px solid #19485F; margin-top: 5px;">
                     <strong>Total:</strong>
-                    <span>S/. ${parseFloat(cotizacion.total).toFixed(2)}</span>
+                    <span>S/. ${parseFloat(cotizacion.total || 0).toFixed(2)}</span>
                 </div>
             </div>
         </div>
