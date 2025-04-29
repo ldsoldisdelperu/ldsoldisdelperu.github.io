@@ -180,43 +180,27 @@ function cargarUnidades(cliente) {
 }
 
 function actualizarPrecioItem(fila) {
-    const prioridad = document.getElementById('prioridad').value;
-    const departamento = document.getElementById('departamento').value;
     const itemSelect = fila.querySelector('.item');
     const option = itemSelect.options[itemSelect.selectedIndex];
+    const cantidad = parseInt(fila.querySelector('.cantidad').value) || 1;
 
-    if (!option || !option.value || !prioridad || !departamento) {
+    if (!option || !option.value) {
         fila.querySelector('.precio').value = '';
+        fila.querySelector('.total').value = '';
         fila.querySelector('.peso').value = '0';
         calcularTotales();
         return;
     }
 
-    const cantidad = parseInt(fila.querySelector('.cantidad').value) || 1;
-    const costo = parseFloat(option.dataset.costo) || 0;
-    const peso = parseFloat(option.dataset.peso) || 0;
-    const pesoTotal = peso * cantidad;
+    const precioUnitario = parseFloat(option.dataset.costo) || 0;
+    const peso = option.dataset.peso || '0';
+    const precioTotal = precioUnitario * cantidad;
 
-    // Calcular flete para este ítem
-    auth.llamarServidor('calcularFlete', {
-        prioridad: prioridad,
-        departamento: departamento
-    })
-    .then(response => {
-        if (!response.success) {
-            throw new Error('Error al calcular flete');
-        }
-        const costoFlete = response.data.costo_kilo * pesoTotal;
-        const precioConFlete = (costo * cantidad) + costoFlete;
-        
-        fila.querySelector('.precio').value = precioConFlete.toFixed(2);
-        fila.querySelector('.peso').value = peso;
-        calcularTotales();
-    })
-    .catch(error => {
-        console.error('Error al calcular flete:', error);
-        alert('Error al calcular el flete');
-    });
+    // Mostrar el precio unitario y total
+    fila.querySelector('.precio').value = precioUnitario.toFixed(2);
+    fila.querySelector('.total').value = precioTotal.toFixed(2);
+    fila.querySelector('.peso').value = peso;
+    calcularTotales();
 }
 
 function agregarNuevaFila() {
@@ -334,20 +318,43 @@ function calcularTotales() {
         return;
     }
 
-    // Calcular subtotal de items (ahora los precios ya incluyen el flete)
-    let subtotal = 0;
+    let subtotalSinFlete = 0;
+    let pesoTotal = 0;
     
     document.querySelectorAll('.item-row').forEach(fila => {
-        const precio = parseFloat(fila.querySelector('.precio').value) || 0;
-        subtotal += precio;  // El precio ya incluye el flete
+        const precioTotal = parseFloat(fila.querySelector('.total').value) || 0;
+        const peso = parseFloat(fila.querySelector('.peso').value) || 0;
+        const cantidad = parseInt(fila.querySelector('.cantidad').value) || 1;
+        
+        subtotalSinFlete += precioTotal;
+        pesoTotal += peso * cantidad;
     });
-    
-    const igv = subtotal * 0.18;
-    const total = subtotal + igv;
 
-    document.getElementById('subtotal').value = subtotal.toFixed(2);
-    document.getElementById('igv').value = igv.toFixed(2);
-    document.getElementById('total').value = total.toFixed(2);
+    // Calcular flete
+    auth.llamarServidor('calcularFlete', {
+        prioridad: prioridad,
+        departamento: departamento
+    })
+    .then(response => {
+        if (!response.success) {
+            throw new Error('Error al calcular flete');
+        }
+        const costoFletePorKilo = response.data.costo_kilo;
+        const costoFleteTotal = pesoTotal * costoFletePorKilo;
+        
+        // Subtotal incluye productos + flete
+        const subtotal = subtotalSinFlete + costoFleteTotal;
+        const igv = subtotal * 0.18;
+        const total = subtotal + igv;
+
+        document.getElementById('subtotal').value = subtotal.toFixed(2);
+        document.getElementById('igv').value = igv.toFixed(2);
+        document.getElementById('total').value = total.toFixed(2);
+    })
+    .catch(error => {
+        console.error('Error al calcular flete:', error);
+        alert('Error al calcular el flete');
+    });
 }
 
 function guardarCotizacion() {
@@ -364,7 +371,8 @@ function guardarCotizacion() {
         const categoria = fila.querySelector('.categoria').value;
         const item = fila.querySelector('.item').value;
         const cantidad = parseInt(fila.querySelector('.cantidad').value) || 1;
-        const precio = parseFloat(fila.querySelector('.precio').value) || 0;
+        const precioUnitario = parseFloat(fila.querySelector('.precio').value) || 0;
+        const precioTotal = parseFloat(fila.querySelector('.total').value) || 0;
         const peso = parseFloat(fila.querySelector('.peso').value) || 0;
 
         if (categoria && item) {
@@ -372,7 +380,8 @@ function guardarCotizacion() {
                 categoria: categoria,
                 item: item,
                 cantidad: cantidad,
-                precio: precio,
+                precio_unitario: precioUnitario,
+                precio_total: precioTotal,
                 peso: peso
             });
         }
