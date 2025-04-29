@@ -333,133 +333,92 @@
         .modal {
             display: none;
             position: fixed;
-            top: 0;
+            z-index: 1000;
             left: 0;
+            top: 0;
             width: 100%;
             height: 100%;
             background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
             overflow-y: auto;
-            padding: 20px;
         }
 
         .modal-content {
-            position: relative;
-            background-color: var(--white);
-            margin: 20px auto;
-            padding: 2rem;
+            background-color: #fff;
+            margin: 2% auto;
+            padding: 20px;
+            border-radius: 8px;
             width: 90%;
-            max-width: 800px;
-            border-radius: 15px;
-            box-shadow: 0 4px 20px var(--shadow);
-            max-height: 90vh;
-            overflow-y: auto;
+            max-width: 900px;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
         }
 
         .modal-header {
-            position: sticky;
-            top: 0;
-            background-color: var(--white);
-            padding: 1rem 0;
-            margin-bottom: 1rem;
-            border-bottom: 2px solid var(--gray-light);
-            z-index: 1;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
         }
 
-        .modal-header h2 {
-            margin: 0;
-            color: var(--primary-color);
-        }
-
-        .close {
-            position: absolute;
-            right: 1.5rem;
-            top: 1.5rem;
+        .modal-title {
             font-size: 1.5rem;
-            cursor: pointer;
             color: var(--primary-color);
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            background-color: var(--gray-light);
-            transition: all 0.3s ease;
+            margin: 0;
         }
 
-        .close:hover {
-            background-color: var(--primary-color);
-            color: var(--white);
+        .btn-group {
+            display: flex;
+            gap: 10px;
         }
 
         .modal-body {
-            padding: 1rem 0;
+            padding: 20px 0;
         }
 
-        .detail-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
+        .cotizacion-header {
+            margin-bottom: 30px;
         }
 
-        .detail-item {
-            padding: 1rem;
-            background-color: var(--gray-light);
-            border-radius: 8px;
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            margin: -10px;
         }
 
-        .detail-label {
-            font-weight: bold;
-            color: var(--primary-dark);
+        .col-md-6 {
+            flex: 0 0 50%;
+            padding: 10px;
         }
 
-        .items-table {
+        .text-right {
+            text-align: right;
+        }
+
+        .mt-4 {
+            margin-top: 20px;
+        }
+
+        .table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 1rem;
-        }
-
-        .items-table th {
-            background-color: var(--success);
-            color: var(--white);
-            padding: 0.8rem;
-            text-align: left;
-        }
-
-        .items-table td {
-            padding: 0.8rem;
-            border-bottom: 1px solid var(--gray);
-        }
-
-        /* Estilos adicionales para los botones de estado */
-        .btn-purple {
-            background-color: #6f42c1;
-            color: white;
-        }
-        
-        .btn-purple:hover {
-            background-color: #5a32a3;
-        }
-
-        /* Estilos para los badges de estado */
-        .badge {
-            padding: 0.4rem 0.8rem;
-            color: white;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Ajustes para el botón de Excel de DataTables */
-        .dt-buttons .btn-success {
             margin-bottom: 1rem;
+        }
+
+        .table th,
+        .table td {
+            padding: 12px;
+            border: 1px solid #dee2e6;
+        }
+
+        .thead-dark th {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .table-bordered {
+            border: 1px solid #dee2e6;
         }
 
         @media (max-width: 768px) {
@@ -486,8 +445,19 @@
                 justify-content: center;
             }
 
-            .detail-grid {
-                grid-template-columns: 1fr;
+            .modal-content {
+                margin: 0;
+                width: 100%;
+                height: 100%;
+                border-radius: 0;
+            }
+
+            .col-md-6 {
+                flex: 0 0 100%;
+            }
+
+            .btn-group {
+                flex-direction: column;
             }
 
             h1 {
@@ -699,6 +669,52 @@
             border-radius: 4px;
             z-index: 1000;
             pointer-events: none;
+        }
+
+        /* Estilos para impresión */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            
+            .modal-content, .modal-content * {
+                visibility: visible;
+            }
+            
+            .modal-content {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 2rem;
+            }
+
+            .modal-header .close,
+            .actions {
+                display: none !important;
+            }
+
+            .quotation-header {
+                margin-bottom: 3rem !important;
+            }
+
+            .quotation-info {
+                page-break-inside: avoid;
+            }
+
+            .items-section table {
+                page-break-inside: auto;
+            }
+
+            .items-section tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+
+            .totals-section {
+                page-break-inside: avoid;
+                margin-top: 2rem !important;
+            }
         }
     </style>
 </head>
