@@ -681,8 +681,33 @@ async function mostrarDetalleCotizacion(cotizacion) {
             items = cotizacion.items;
         }
 
-        // Formatear la fecha
-        const fecha = new Date(cotizacion.fecha).toLocaleDateString();
+        // Formatear la fecha correctamente
+        let fecha;
+        try {
+            // Primero intentamos parsear la fecha asumiendo que viene en formato ISO
+            const fechaObj = new Date(cotizacion.fecha);
+            if (isNaN(fechaObj.getTime())) {
+                // Si la fecha es inválida, verificamos si tiene guiones
+                if (cotizacion.fecha.includes('-')) {
+                    // Si tiene guiones, asumimos formato YYYY-MM-DD
+                    const [year, month, day] = cotizacion.fecha.split('-');
+                    fecha = `${day}/${month}/${year}`;
+                } else {
+                    // Si no tiene guiones, mostramos la fecha como está
+                    fecha = cotizacion.fecha;
+                }
+            } else {
+                // Si es una fecha válida, la formateamos
+                fecha = fechaObj.toLocaleDateString('es-PE', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+            }
+        } catch (e) {
+            console.error('Error al formatear fecha:', e);
+            fecha = cotizacion.fecha || 'Fecha no disponible';
+        }
 
         // Crear el modal si no existe
         let modalElement = document.getElementById('detalleModal');
@@ -730,7 +755,7 @@ async function mostrarDetalleCotizacion(cotizacion) {
                             </div>
                             <div class="col-md-6">
                                 <h5>Detalles</h5>
-                                <p>Prioridad: ${cotizacion.prioridad || 'N/A'}</p>
+                                <p>Prioridad: ${cotizacion.prioridad || 'Normal'}</p>
                                 <p>Estado: ${cotizacion.estado ? cotizacion.estado.toUpperCase() : 'PENDIENTE'}</p>
                             </div>
                         </div>
